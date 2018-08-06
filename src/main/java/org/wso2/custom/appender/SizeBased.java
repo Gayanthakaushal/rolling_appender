@@ -8,10 +8,7 @@ import org.apache.log4j.helpers.LogLog;
 import org.apache.log4j.helpers.OptionConverter;
 import org.apache.log4j.spi.LoggingEvent;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.io.Writer;
+import java.io.*;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -56,14 +53,29 @@ public class SizeBased  extends FileAppender {
         boolean renameSucceeded = true;
         if (this.maxBackupIndex > 0) {
             File file = new File(this.fileName + '.' + this.maxBackupIndex);
-            if (file.exists()) {
+            File parentDir = new File(this.fileName).getParentFile();
+
+            FilenameFilter textFilter = new FilenameFilter() {
+                public boolean accept(File dir, String name) {
+                    if(name.contains("wso2carbon.log")){
+                        return true;
+                    }else {
+                        return false;
+                    }
+                }
+            };
+            File[] files = parentDir.listFiles(textFilter);
+            if (checkFileName(files,file)) {
+                file = getExactFileName(files,file);
                 renameSucceeded = file.delete();
             }
 
             File target;
             for(int i = this.maxBackupIndex - 1; i >= 1 && renameSucceeded; --i) {
-                file = new File(this.fileName + "." + i + "."+ newDate);
-                if (file.exists()) {
+                file = new File(this.fileName + "." + i);
+
+                if (checkFileName(files,file)) {
+                    file = getExactFileName(files,file);
                     target = new File(this.fileName + '.' + (i + 1) + "."+ newDate);
                     LogLog.debug("Renaming file " + file + " to " + target);
                     renameSucceeded = file.renameTo(target);
@@ -124,6 +136,26 @@ public class SizeBased  extends FileAppender {
 
     public void setMaxFileSize(String value) {
         this.maxFileSize = OptionConverter.toFileSize(value, this.maxFileSize + 1L);
+    }
+
+    public boolean checkFileName(File [] files, File newFile){
+        for (File file : files) {
+            if (file.getName().contains(newFile.getName() + ".")) {
+                return true;
+            }
+            continue;
+        }
+        return false;
+    }
+
+    public File getExactFileName(File [] files, File newFile){
+        for (File file : files) {
+            if (file.getName().contains(newFile.getName() + ".")) {
+                return file;
+            }
+            continue;
+        }
+        return null;
     }
 
     protected void setQWForFiles(Writer writer) {
