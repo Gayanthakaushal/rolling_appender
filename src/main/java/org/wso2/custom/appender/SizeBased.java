@@ -76,7 +76,11 @@ public class SizeBased  extends FileAppender {
 
                 if (checkFileName(files,file)) {
                     file = getExactFileName(files,file);
-                    target = new File(this.fileName + '.' + (i + 1) + "."+ newDate);
+                    //Sample date looks like this wso2carbon.log.79.21082018-11-36
+                    int lastIndexOf = file.getName().lastIndexOf(".");
+                    String originalBackupDate = file.getName().substring(lastIndexOf+1);
+
+                    target = new File(this.fileName + '.' + (i + 1) + "."+ originalBackupDate);
                     LogLog.debug("Renaming file " + file + " to " + target);
                     renameSucceeded = file.renameTo(target);
                 }
@@ -138,7 +142,8 @@ public class SizeBased  extends FileAppender {
         this.maxFileSize = OptionConverter.toFileSize(value, this.maxFileSize + 1L);
     }
 
-    public boolean checkFileName(File [] files, File newFile){
+    //checking the log file in the directory by matching the index of the file
+    private boolean checkFileName(File [] files, File newFile){
         for (File file : files) {
             if (file.getName().contains(newFile.getName() + ".")) {
                 return true;
@@ -148,7 +153,8 @@ public class SizeBased  extends FileAppender {
         return false;
     }
 
-    public File getExactFileName(File [] files, File newFile){
+    //get the log file name from the directory by matching the index of the file
+    private File getExactFileName(File [] files, File newFile){
         for (File file : files) {
             if (file.getName().contains(newFile.getName() + ".")) {
                 return file;
