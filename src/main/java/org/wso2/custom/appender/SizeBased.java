@@ -7,16 +7,25 @@ import org.apache.log4j.helpers.CountingQuietWriter;
 import org.apache.log4j.helpers.LogLog;
 import org.apache.log4j.helpers.OptionConverter;
 import org.apache.log4j.spi.LoggingEvent;
+import org.wso2.carbon.context.CarbonContext;
+import org.wso2.carbon.utils.logging.LoggingUtils;
+import org.wso2.carbon.utils.logging.TenantAwareLoggingEvent;
 
 import java.io.*;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
+import java.util.regex.Pattern;
 
 public class SizeBased  extends FileAppender {
     protected long maxFileSize = 10485760L;
     protected int maxBackupIndex = 1;
     private long nextRollover = 0L;
+    private String maskingPatternFile;
+    private List<Pattern> maskingPatterns;
 
     public SizeBased() {
     }
@@ -169,7 +178,20 @@ public class SizeBased  extends FileAppender {
     }
 
     protected void subAppend(LoggingEvent event) {
-        super.subAppend(event);
+
+        int tenantId = AccessController.doPrivileged(new PrivilegedAction<Integer>() {
+            public Integer run() {
+                return CarbonContext.getThreadLocalCarbonContext().getTenantId();
+            }
+        });
+
+        String serviceName = CarbonContext.getThreadLocalCarbonContext().getApplicationName();
+
+        // acquire the tenant aware logging event from the logging event
+        TenantAwareLoggingEvent tenantAwareLoggingEvent = LoggingUtils
+                .getTenantAwareLogEvent(this.maskingPatterns, event, tenantId, serviceName);
+        super.subAppend(tenantAwareLoggingEvent);
+        //super.subAppend(event);
         if (this.fileName != null && this.qw != null) {
             long size = ((CountingQuietWriter)this.qw).getCount();
             if (size >= this.maxFileSize && size >= this.nextRollover) {
@@ -177,5 +199,21 @@ public class SizeBased  extends FileAppender {
             }
         }
 
+    }
+
+    public String getMaskingPatternFile() {
+
+        return this.maskingPatternFile;
+    }
+
+    /**
+     * Set the maskingPatternFile parameter.
+     * In this method, masking patterns will be loaded from the provided file.
+     *
+     * @param maskingPatternFile : The absolute path of the masking pattern file.
+     */
+    public void setMaskingPatternFile(String maskingPatternFile) {
+
+        this.maskingPatterns = LoggingUtils.loadMaskingPatterns(maskingPatternFile);
     }
 }
